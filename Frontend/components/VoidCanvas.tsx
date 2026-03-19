@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface ProjectData {
   id: number;
@@ -50,6 +52,7 @@ const ORBITS = [
 ];
 
 export default function VoidCanvas() {
+  const pathname = usePathname();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const miniCanvasRef = useRef<HTMLCanvasElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -81,7 +84,6 @@ export default function VoidCanvas() {
   const orbPositions = useRef(PROJECTS.map(() => ({ x: 0, y: 0, r: 0 })));
 
   // Initialize particles once
-  const jetParticles = useRef<any[]>([]);
   const diskParticles = useRef<any[]>([]);
   const stars = useRef<any[]>([]);
 
@@ -99,21 +101,7 @@ export default function VoidCanvas() {
     }
     stars.current = s;
 
-    // Jet particles
-    const jp = [];
-    for (let i = 0; i < 180; i++) {
-      jp.push({
-        side: i % 2 === 0 ? 1 : -1,
-        spread: (Math.random() - 0.5) * 0.18,
-        speed: 0.004 + Math.random() * 0.005,
-        life: Math.random(),
-        size: 0.5 + Math.random() * 1.5,
-        opacity: Math.random(),
-      });
-    }
-    jetParticles.current = jp;
-
-    // Disk particles
+    // Disk particles (Purple accretion ring)
     const dp = [];
     for (let i = 0; i < 300; i++) {
       const r = 0.09 + Math.random() * 0.13;
@@ -121,9 +109,9 @@ export default function VoidCanvas() {
         angle: Math.random() * Math.PI * 2,
         r, baseR: r,
         speed: (0.003 + Math.random() * 0.004) * (Math.random() > 0.5 ? 1 : -1),
-        size: 0.5 + Math.random() * 1.2,
+        size: 0.5 + Math.random() * 1.5,
         opacity: 0.3 + Math.random() * 0.7,
-        hue: 20 + Math.random() * 30,
+        hue: 260 + Math.random() * 30, // Purple range replacing orange
       });
     }
     diskParticles.current = dp;
@@ -341,170 +329,120 @@ export default function VoidCanvas() {
       });
     }
 
-    // ─── DRAW: BLACK HOLE ────────────────────────────
-    function drawBlackHole() {
-      st.diskAngle += 0.004;
+    // ─── DRAW: BLACK HOLE LAYERS ─────────────────────
+    const BHR = st.W * 0.085; // slightly smaller than 0.095 to give space
+    const diskTilt = -0.35; // Diagonal tilt like the reference
+    const diskYRatio = 0.12; // Very flat disk
+    const diskR = BHR * 2.2; 
+
+    function drawDiskArc(isFront: boolean) {
       const bx = st.cx, by = st.cy * 0.95;
-      const BHR = st.W * 0.095;
-
-      // Outer haze
-      const outerHaze = ctx.createRadialGradient(bx, by, BHR * 1.2, bx, by, BHR * 4.5);
-      outerHaze.addColorStop(0, 'rgba(80,20,140,0.10)');
-      outerHaze.addColorStop(0.4, 'rgba(50,10,100,0.05)');
-      outerHaze.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = outerHaze;
-      ctx.beginPath();
-      ctx.ellipse(bx, by, BHR * 4.5, BHR * 1.8, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Disk particles (back layer)
-      diskParticles.current.forEach(p => {
-        if (p.speed > 0) return;
-        p.angle += p.speed * (1 + st.t * 0.000001);
-        const pr = p.r * st.W * 0.95;
-        const px = bx + Math.cos(p.angle) * pr;
-        const py = by + Math.sin(p.angle) * pr * 0.22;
-        const depth = Math.sin(p.angle);
-        if (depth < 0) return;
-        const heat = 1 - (p.r - 0.09) / 0.13;
-        ctx.fillStyle = `hsla(${p.hue},95%,${55 + heat * 25}%,${p.opacity * (0.4 + depth * 0.6)})`;
-        ctx.beginPath();
-        ctx.arc(px, py, p.size * (0.6 + depth * 0.4), 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Relativistic disk sweep
-      for (let layer = 4; layer >= 0; layer--) {
-        const innerR = BHR * (1.15 + layer * 0.18);
-        const outerR = BHR * (2.1 + layer * 0.35);
-        const tiltY = 0.22 + layer * 0.02;
-        const alpha = 0.18 - layer * 0.03;
-
-        ctx.save();
-        ctx.translate(bx, by);
-
-        const grad = ctx.createConicGradient(st.diskAngle, 0, 0);
-        const bright = `hsla(38,100%,75%,${alpha * 1.8})`;
-        const mid = `hsla(25,95%,55%,${alpha})`;
-        const dim = `hsla(15,80%,30%,${alpha * 0.4})`;
-        const vdim = `hsla(10,60%,20%,${alpha * 0.15})`;
-        grad.addColorStop(0, bright);
-        grad.addColorStop(0.15, mid);
-        grad.addColorStop(0.35, dim);
-        grad.addColorStop(0.5, vdim);
-        grad.addColorStop(0.65, dim);
-        grad.addColorStop(0.85, mid);
-        grad.addColorStop(1, bright);
-
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = outerR - innerR;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, (innerR + outerR) / 2, ((innerR + outerR) / 2) * tiltY, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Photon ring
-      const photonR = BHR * 1.18;
       ctx.save();
       ctx.translate(bx, by);
-      const photonG = ctx.createConicGradient(st.diskAngle + Math.PI * 0.3, 0, 0);
-      photonG.addColorStop(0, 'rgba(255,240,200,0.9)');
-      photonG.addColorStop(0.2, 'rgba(255,200,120,0.4)');
-      photonG.addColorStop(0.5, 'rgba(200,150,80,0.1)');
-      photonG.addColorStop(0.8, 'rgba(255,200,120,0.4)');
-      photonG.addColorStop(1, 'rgba(255,240,200,0.9)');
-      ctx.strokeStyle = photonG;
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = 'rgba(255,220,150,0.8)';
-      ctx.shadowBlur = 8;
+      ctx.rotate(diskTilt);
+      
+      // For a flat disk tilted, front is 0 to PI, back is PI to 2PI
+      const startA = isFront ? 0 : Math.PI;
+      const endA = isFront ? Math.PI : Math.PI * 2;
+
+      // Outer diffuse glow
       ctx.beginPath();
-      ctx.ellipse(0, 0, photonR, photonR * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, diskR * 1.1, diskR * 1.1 * diskYRatio, 0, startA, endA);
+      ctx.strokeStyle = isFront ? 'rgba(160,80,255,0.1)' : 'rgba(140,60,250,0.05)';
+      ctx.lineWidth = BHR * 0.4;
       ctx.stroke();
+
+      // Dense glowing rings
+      for(let i=0; i<3; i++) {
+        ctx.beginPath();
+        const r = diskR * (1 - i * 0.15);
+        ctx.ellipse(0, 0, r, r * diskYRatio, 0, startA, endA);
+        
+        ctx.lineWidth = i === 0 ? 1.5 : (i === 1 ? 3 : 8);
+        ctx.strokeStyle = i === 0 ? 'rgba(255,240,255,0.9)' : 
+                          (i === 1 ? 'rgba(210,140,255,0.6)' : 'rgba(140,40,255,0.2)');
+        
+        if (isFront && i === 0) {
+          ctx.shadowColor = 'rgba(210,140,255,0.8)';
+          ctx.shadowBlur = 15;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+        ctx.stroke();
+      }
+
       ctx.restore();
 
-      // Event horizon rim
-      const rimG = ctx.createRadialGradient(bx, by, BHR * 0.85, bx, by, BHR * 1.1);
+      // Particles belonging to this side
+      const pzThreshold = 0;
+      diskParticles.current.forEach(p => {
+        p.angle += p.speed * (1 + st.t * 0.000001);
+        const px = Math.cos(p.angle) * p.r * st.W * 1.2;
+        const py = Math.sin(p.angle) * p.r * st.W * 1.2 * diskYRatio;
+        
+        // rotate particle position by diskTilt
+        const rotX = px * Math.cos(diskTilt) - py * Math.sin(diskTilt);
+        const rotY = px * Math.sin(diskTilt) + py * Math.cos(diskTilt);
+        
+        const finalX = bx + rotX;
+        const finalY = by + rotY;
+
+        // Depth is approximately Math.sin(p.angle). 
+        // angle=0->PI is front (sin>0), PI->2PI is back (sin<0)
+        const depth = Math.sin(p.angle);
+        const isParticleFront = depth >= 0;
+
+        if (isParticleFront === isFront) {
+          const heat = 1 - (p.r - 0.09) / 0.13;
+          ctx.fillStyle = `hsla(${p.hue},90%,${65 + heat * 20}%,${p.opacity * (0.4 + Math.abs(depth) * 0.6)})`;
+          ctx.beginPath();
+          ctx.arc(finalX, finalY, p.size * (0.6 + Math.abs(depth) * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
+
+    function drawBlackHoleCore() {
+      const bx = st.cx, by = st.cy * 0.95;
+
+      // Event horizon edge sharpness (matte black with tiny edge bleed)
+      const rimG = ctx.createRadialGradient(bx, by, BHR * 0.95, bx, by, BHR * 1.05);
       rimG.addColorStop(0, 'rgba(0,0,0,1)');
-      rimG.addColorStop(0.7, 'rgba(20,5,50,0.95)');
-      rimG.addColorStop(0.9, 'rgba(80,20,160,0.3)');
+      rimG.addColorStop(0.7, 'rgba(25,5,40,0.8)');
+      rimG.addColorStop(0.9, 'rgba(60,20,100,0.3)');
       rimG.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = rimG;
       ctx.beginPath();
-      ctx.arc(bx, by, BHR * 1.12, 0, Math.PI * 2);
+      ctx.arc(bx, by, BHR * 1.08, 0, Math.PI * 2);
       ctx.fill();
 
-      // Core black
+      // Core (Absolute 100% flat matte black, no reflection)
       ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.arc(bx, by, BHR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Disk particles (front layer)
-      diskParticles.current.forEach(p => {
-        if (p.speed < 0) return;
-        p.angle += p.speed * (1 + st.t * 0.000001);
-        const pr = p.r * st.W * 0.95;
-        const px = bx + Math.cos(p.angle) * pr;
-        const py = by + Math.sin(p.angle) * pr * 0.22;
-        const depth = Math.sin(p.angle);
-        if (depth > 0) return;
-        const heat = 1 - (p.r - 0.09) / 0.13;
-        ctx.fillStyle = `hsla(${p.hue},95%,${55 + heat * 25}%,${p.opacity * (0.4 + Math.abs(depth) * 0.6)})`;
-        ctx.beginPath();
-        ctx.arc(px, py, p.size * (0.6 + Math.abs(depth) * 0.4), 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Polar jets
-      drawJets(bx, by, BHR);
-
-      // Lensing shimmer
+      // Lensing shimmer around the edges
       ctx.save();
       ctx.translate(bx, by);
-      const lensG = ctx.createRadialGradient(0, 0, BHR, 0, 0, BHR * 1.6);
+      const lensG = ctx.createRadialGradient(0, 0, BHR, 0, 0, BHR * 1.4);
       lensG.addColorStop(0, 'rgba(100,50,200,0.0)');
-      lensG.addColorStop(0.5, 'rgba(130,70,230,0.06)');
-      lensG.addColorStop(0.8, 'rgba(80,30,160,0.04)');
+      lensG.addColorStop(0.5, 'rgba(130,70,230,0.04)');
+      lensG.addColorStop(0.8, 'rgba(80,15,160,0.02)');
       lensG.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = lensG;
       ctx.beginPath();
-      ctx.arc(0, 0, BHR * 1.6, 0, Math.PI * 2);
+      ctx.arc(0, 0, BHR * 1.4, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
 
-    function drawJets(bx: number, by: number, BHR: number) {
-      jetParticles.current.forEach(p => {
-        p.life += p.speed;
-        if (p.life > 1) p.life = 0;
-        const progress = p.life;
-        const jx = bx + Math.sin(p.spread + progress * p.spread * 3) * BHR * progress * 2.5;
-        const jy = by + p.side * progress * BHR * 3.5;
-        const fade = progress < 0.2 ? progress / 0.2 : 1 - (progress - 0.2) / 0.8;
-        const ps = p.size * (1 - progress * 0.5);
-        const r = Math.floor(160 + progress * 60);
-        const g = Math.floor(100 - progress * 60);
-        ctx.fillStyle = `rgba(${r},${g},255,${fade * p.opacity * 0.7})`;
-        ctx.beginPath();
-        ctx.arc(jx, jy, ps, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      [-1, 1].forEach(side => {
-        const jg = ctx.createRadialGradient(bx, by + side * BHR * 0.1, 0, bx, by + side * BHR * 0.5, BHR * 0.6);
-        jg.addColorStop(0, 'rgba(180,140,255,0.25)');
-        jg.addColorStop(0.4, 'rgba(120,80,220,0.08)');
-        jg.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = jg;
-        ctx.beginPath();
-        ctx.ellipse(bx, by + side * BHR * 0.5, BHR * 0.25, BHR * 0.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
     // ─── DRAW: ORBITS ────────────────────────────────
-    function drawOrbits() {
+    function drawOrbitsArc(isFront: boolean) {
+      // In JS sin(angle) controls z-depth. Front is angles 0 to PI. Back is PI to 2PI.
+      const startPct = isFront ? 0 : 0.5;
+      const endPct = isFront ? 0.5 : 1.0;
+
       for (let oi = 0; oi < ORBITS.length; oi++) {
         const cfg = ORBITS[oi];
         const isSelected = st.selectedOrbit === oi;
@@ -517,23 +455,24 @@ export default function VoidCanvas() {
         ctx.lineWidth = isSelected ? 1.5 : 0.8;
         ctx.setLineDash(isSelected ? [] : [4, 12]);
 
-        if (isSelected) {
+        if (isSelected && isFront) {
           ctx.shadowColor = 'rgba(192,132,252,0.4)';
           ctx.shadowBlur = 12;
         }
 
         ctx.beginPath();
-        const pts = 200;
+        const pts = 100;
+        let first = true;
         for (let i = 0; i <= pts; i++) {
-          const angle = (i / pts) * Math.PI * 2;
+          const angle = (startPct + (i / pts) * (endPct - startPct)) * Math.PI * 2;
           const pt = projectEllipse(angle, cfg);
-          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          if (first) { ctx.moveTo(pt.x, pt.y); first = false; }
           else ctx.lineTo(pt.x, pt.y);
         }
-        ctx.closePath();
         ctx.stroke();
 
-        if (isSelected) {
+        // Draw label only on front pass
+        if (isSelected && isFront) {
           const labelPt = projectEllipse(Math.PI * 1.2, cfg);
           ctx.font = '10px "IBM Plex Mono"';
           ctx.fillStyle = 'rgba(220,180,255,0.7)';
@@ -546,7 +485,7 @@ export default function VoidCanvas() {
     }
 
     // ─── DRAW: ORBS ──────────────────────────────────
-    function drawOrbs() {
+    function drawOrbsSet(isFront: boolean) {
       // Sort by depth (back to front)
       const sorted = st.projects.map((p, i) => ({ p, i }));
       sorted.sort((a, b) => {
@@ -555,17 +494,15 @@ export default function VoidCanvas() {
         return ptB.pz - ptA.pz;
       });
 
-      // Update phases
-      st.projects.forEach(p => {
-        p.phase = (p.phase + st.orbitSpeeds[p.tier]) % 1;
-      });
-
       st.hoveredOrb = -1;
 
       sorted.forEach(({ p, i }) => {
         const cfg = ORBITS[p.tier];
         const angle = p.phase * Math.PI * 2;
         const pt = projectEllipse(angle, cfg);
+
+        // Front pass renders elements with pt.pz >= 0, Back pass renders pt.pz < 0
+        if (isFront ? pt.pz < 0 : pt.pz >= 0) return;
 
         const isExpanded = st.expandedOrb === i;
         const depthScale = 0.6 + pt.depth * 0.4;
@@ -690,9 +627,24 @@ export default function VoidCanvas() {
       }
 
       drawStars();
-      drawBlackHole();
-      drawOrbits();
-      drawOrbs();
+
+      // BACK LAYER: Behind the black hole
+      drawOrbitsArc(false);  // back of orbits
+      drawOrbsSet(false);    // orbs pushed into -Z space
+      drawDiskArc(false);    // back of accretion disk
+      
+      // CORE: Central occlusion body
+      drawBlackHoleCore();   
+      
+      // FRONT LAYER: In front of the black hole
+      drawDiskArc(true);     // front of accretion disk
+      drawOrbitsArc(true);   // front of orbits
+      drawOrbsSet(true);     // orbs pulled into +Z space
+      
+      // Update orb phases globally once per frame
+      st.projects.forEach(p => {
+        p.phase = (p.phase + st.orbitSpeeds[p.tier]) % 1;
+      });
 
       animId = requestAnimationFrame(draw);
     }
@@ -763,12 +715,12 @@ export default function VoidCanvas() {
           <p>AI Engineer · Goa, IN</p>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation - Converted to Next.js Links */}
         <div className="void-nav">
-          <a className="active">WORK</a>
-          <a>STACK</a>
-          <a>SIGNAL</a>
-          <a>CONTACT</a>
+          <Link href="/" className={pathname === '/' ? 'active' : ''}>WORK</Link>
+          <Link href="/stack" className={pathname === '/stack' ? 'active' : ''}>STACK</Link>
+          <Link href="/signal" className={pathname === '/signal' ? 'active' : ''}>SIGNAL</Link>
+          <Link href="/contact" className={pathname === '/contact' ? 'active' : ''}>CONTACT</Link>
         </div>
 
         {/* Hint */}
