@@ -1,0 +1,31 @@
+{
+  "kind": "singleType",
+  "collectionName": "buildlogs",
+  "info": {
+    "singularName": "build-log",
+    "pluralName": "build-logs",
+    "displayName": "Build Log",
+    "description": "Current status for Mission Status strip"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "currentProject": {
+      "type": "string"
+    },
+    "currentStatus": {
+      "type": "string"
+    },
+    "lastSignal": {
+      "type": "datetime"
+    },
+    "openTo": {
+      "type": "json"
+    },
+    "githubActivity": {
+      "type": "text"
+    }
+  }
+}

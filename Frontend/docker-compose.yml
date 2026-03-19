@@ -1,0 +1,66 @@
+version: '3'
+services:
+  strapi:
+    container_name: void-sys-cms
+    build:
+      context: ./cms
+      dockerfile: Dockerfile
+    image: void-sys-cms:latest
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: strapi
+      DATABASE_USERNAME: strapi
+      DATABASE_PASSWORD: strapi_password
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      APP_KEYS: ${APP_KEYS}
+      NODE_ENV: production
+    volumes:
+      - ./cms/config:/opt/app/config
+      - ./cms/src:/opt/app/src
+      - ./cms/package.json:/opt/package.json
+      - ./cms/public/uploads:/opt/app/public/uploads
+    ports:
+      # Exposed internally only, Cloudflare Tunnel maps to localhost:1337
+      - '127.0.0.1:1337:1337'
+    networks:
+      - void-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1337/_health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+        
+  # Only use local postgres if not using Neon.tech. 
+  # If using Neon, comment this out and update DATABASE_* env vars above.
+  postgres:
+    image: postgres:15-alpine
+    container_name: void-sys-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: strapi
+      POSTGRES_PASSWORD: strapi_password
+      POSTGRES_DB: strapi
+    volumes:
+      - void-sys-data:/var/lib/postgresql/data
+    networks:
+      - void-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U strapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  void-net:
+    driver: bridge
+
+volumes:
+  void-sys-data:
