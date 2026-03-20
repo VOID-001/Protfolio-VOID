@@ -1,7 +1,3 @@
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// VOID.SYS — TypeScript Interfaces
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 export type Domain = 'AI_ML' | 'LLM_INFRA' | 'BACKEND' | 'FRONTEND' | 'DEVOPS' | 'RESEARCH';
 export type OrbitTier = 'A' | 'B' | 'C';
 export type ProjectStatus = 'LIVE' | 'WIP' | 'ARCHIVED';
@@ -26,7 +22,9 @@ export interface Project {
   thumbnailUrl: string;
   videoLoopUrl?: string;
   githubUrl: string;
+  projectUrl?: string;
   status: ProjectStatus;
+  planetColor?: string;
   graphEdges: GraphEdge[];
 }
 
@@ -58,7 +56,17 @@ export interface BuildLog {
   githubActivity: string;
 }
 
-// Strapi response wrappers
+export interface ContactDetail {
+  title: string;
+  intro: string;
+  email: string;
+  githubUrl: string;
+  linkedinUrl: string;
+  xUrl: string;
+  location: string;
+  availability: string;
+}
+
 export interface StrapiData<T> {
   id: number;
   attributes: T;
@@ -81,7 +89,6 @@ export interface StrapiSingleResponse<T> {
   meta: Record<string, unknown>;
 }
 
-// Three.js scene types
 export interface OrbitConfig {
   xRadius: number;
   yRadius: number;
@@ -90,3 +97,4 @@ export interface OrbitConfig {
 }
 
 export type InteractionState = 'idle' | 'hovering' | 'selected';
+

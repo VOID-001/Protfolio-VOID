@@ -1,0 +1,25 @@
+{
+  "kind": "singleType",
+  "collectionName": "contact_details",
+  "info": {
+    "singularName": "contact-detail",
+    "pluralName": "contact-details",
+    "displayName": "Contact Detail",
+    "description": "Contact page content"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": { "type": "string", "default": "Contact" },
+    "intro": { "type": "text" },
+    "email": { "type": "email" },
+    "githubUrl": { "type": "string" },
+    "linkedinUrl": { "type": "string" },
+    "xUrl": { "type": "string" },
+    "location": { "type": "string" },
+    "availability": { "type": "string" }
+  }
+}
+

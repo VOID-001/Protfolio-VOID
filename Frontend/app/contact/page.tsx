@@ -1,8 +1,77 @@
 import Navigation from '@/components/ui/Navigation';
 import IdentityMark from '@/components/ui/IdentityMark';
 import MissionStatus from '@/components/ui/MissionStatus';
+import { getContactDetail } from '@/lib/strapi';
 
-export default function ContactPage() {
+function ContactLink({
+  label,
+  href,
+  text,
+}: {
+  label: string;
+  href: string;
+  text: string;
+}) {
+  return (
+    <a
+      href={href}
+      target={href.startsWith('mailto:') ? undefined : '_blank'}
+      rel={href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
+      className="glass glass-interactive"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        padding: '20px 24px',
+        borderRadius: '12px',
+        textDecoration: 'none',
+        color: 'var(--void-white)',
+        width: '100%',
+      }}
+    >
+      <span
+        className="font-accent"
+        style={{ fontSize: '10px', color: 'var(--void-purple-300)', minWidth: '60px' }}
+      >
+        {label}
+      </span>
+      <span className="font-mono" style={{ fontSize: '14px' }}>
+        {text}
+      </span>
+    </a>
+  );
+}
+
+export default async function ContactPage() {
+  const contact = await getContactDetail();
+
+  const links = [
+    {
+      label: 'EMAIL',
+      href: `mailto:${contact.email}`,
+      text: contact.email,
+      enabled: Boolean(contact.email),
+    },
+    {
+      label: 'GITHUB',
+      href: contact.githubUrl,
+      text: contact.githubUrl.replace(/^https?:\/\//, '') + ' ->',
+      enabled: Boolean(contact.githubUrl),
+    },
+    {
+      label: 'LINKEDIN',
+      href: contact.linkedinUrl,
+      text: contact.linkedinUrl.replace(/^https?:\/\//, '') + ' ->',
+      enabled: Boolean(contact.linkedinUrl),
+    },
+    {
+      label: 'X / TWITTER',
+      href: contact.xUrl,
+      text: contact.xUrl.replace(/^https?:\/\//, '') + ' ->',
+      enabled: Boolean(contact.xUrl),
+    },
+  ].filter((item) => item.enabled);
+
   return (
     <div style={{ minHeight: '100vh', padding: '100px 40px 80px' }}>
       <IdentityMark />
@@ -25,7 +94,7 @@ export default function ContactPage() {
             marginBottom: '12px',
           }}
         >
-          Contact
+          {contact.title || 'Contact'}
         </h1>
         <p
           className="font-mono"
@@ -37,11 +106,9 @@ export default function ContactPage() {
             lineHeight: 1.7,
           }}
         >
-          Open to collaboration, consulting, and full-time roles in AI/ML
-          engineering. I build production systems, not prototypes.
+          {contact.intro}
         </p>
 
-        {/* Contact links */}
         <div
           style={{
             display: 'flex',
@@ -50,124 +117,33 @@ export default function ContactPage() {
             width: '100%',
           }}
         >
-          <a
-            href="mailto:mangesh@voidsys.dev"
-            className="glass glass-interactive"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              padding: '20px 24px',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: 'var(--void-white)',
-            }}
-          >
-            <span
-              className="font-accent"
-              style={{ fontSize: '10px', color: 'var(--void-purple-300)', minWidth: '60px' }}
-            >
-              EMAIL
-            </span>
-            <span className="font-mono" style={{ fontSize: '14px' }}>
-              mangesh@voidsys.dev
-            </span>
-          </a>
-
-          <a
-            href="https://github.com/mangesh"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="glass glass-interactive"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              padding: '20px 24px',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: 'var(--void-white)',
-            }}
-          >
-            <span
-              className="font-accent"
-              style={{ fontSize: '10px', color: 'var(--void-purple-300)', minWidth: '60px' }}
-            >
-              GITHUB
-            </span>
-            <span className="font-mono" style={{ fontSize: '14px' }}>
-              github.com/mangesh ↗
-            </span>
-          </a>
-
-          <a
-            href="https://linkedin.com/in/mangesh"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="glass glass-interactive"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              padding: '20px 24px',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: 'var(--void-white)',
-            }}
-          >
-            <span
-              className="font-accent"
-              style={{ fontSize: '10px', color: 'var(--void-purple-300)', minWidth: '60px' }}
-            >
-              LINKEDIN
-            </span>
-            <span className="font-mono" style={{ fontSize: '14px' }}>
-              linkedin.com/in/mangesh ↗
-            </span>
-          </a>
-
-          <a
-            href="https://x.com/mangesh"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="glass glass-interactive"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              padding: '20px 24px',
-              borderRadius: '12px',
-              textDecoration: 'none',
-              color: 'var(--void-white)',
-            }}
-          >
-            <span
-              className="font-accent"
-              style={{ fontSize: '10px', color: 'var(--void-purple-300)', minWidth: '60px' }}
-            >
-              X / TWITTER
-            </span>
-            <span className="font-mono" style={{ fontSize: '14px' }}>
-              @mangesh ↗
-            </span>
-          </a>
+          {links.map((link) => (
+            <ContactLink
+              key={link.label}
+              label={link.label}
+              href={link.href}
+              text={link.text}
+            />
+          ))}
         </div>
 
-        {/* Location */}
-        <div
-          className="font-mono"
-          style={{
-            marginTop: '48px',
-            fontSize: '12px',
-            color: 'rgba(248, 246, 255, 0.3)',
-            letterSpacing: '0.04em',
-          }}
-        >
-          Based in Goa, India · Available remotely worldwide
-        </div>
+        {(contact.location || contact.availability) && (
+          <div
+            className="font-mono"
+            style={{
+              marginTop: '48px',
+              fontSize: '12px',
+              color: 'rgba(248, 246, 255, 0.3)',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {[contact.location, contact.availability].filter(Boolean).join(' · ')}
+          </div>
+        )}
       </div>
 
       <MissionStatus />
     </div>
   );
 }
+

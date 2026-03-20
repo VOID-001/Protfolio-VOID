@@ -38,10 +38,12 @@ export default function MissionStatus() {
           const data = await res.json();
           if (data?.data?.attributes) {
             setBuildLog(data.data.attributes as BuildLog);
+          } else if (data?.data) {
+            setBuildLog(data.data as BuildLog);
           }
         }
       } catch {
-        // Use default fallback — never show broken UI
+        // Use default fallback â€” never show broken UI
       }
     }
 
@@ -88,12 +90,13 @@ export default function MissionStatus() {
         <span style={{ color: 'var(--void-purple-300)' }}>
           {buildLog.currentProject}
         </span>{' '}
-        — {buildLog.currentStatus}
+        â€” {buildLog.currentStatus}
       </span>
       <span style={{ opacity: 0.4 }}>|</span>
       <span>Last signal: {formatTimeAgo(buildLog.lastSignal)}</span>
       <span style={{ opacity: 0.4 }}>|</span>
-      <span>Open to: {buildLog.openTo.join(' / ')}</span>
+      <span>Open to: {buildLog.openTo.join(' / ') || 'Open'}</span>
     </div>
   );
 }
+

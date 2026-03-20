@@ -1,0 +1,22 @@
+{
+  "kind": "singleType",
+  "collectionName": "build_logs",
+  "info": {
+    "singularName": "build-log",
+    "pluralName": "build-logs",
+    "displayName": "Build Log",
+    "description": "Mission status strip data"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "currentProject": { "type": "string", "required": true },
+    "currentStatus": { "type": "string", "required": true },
+    "lastSignal": { "type": "datetime", "required": true },
+    "openTo": { "type": "json", "default": [] },
+    "githubActivity": { "type": "text" }
+  }
+}
+

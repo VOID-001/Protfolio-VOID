@@ -2,48 +2,27 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import type { BuildLog, Project } from '@/lib/types';
 import { usePathname } from 'next/navigation';
 
-interface ProjectData {
-  id: number;
-  name: string;
-  domain: string;
-  tier: number;
-  complexity: number;
-  recency: number;
-  desc: string;
-  stack: string[];
-  status: string;
-  github: string;
-  phase: number;
+interface VoidCanvasProps {
+  projects: Project[];
+  buildLog: BuildLog;
 }
 
-const PROJECTS: ProjectData[] = [
-  { id: 0, name: 'Memoire', domain: 'LLM INFRA', tier: 0, complexity: 9, recency: 10,
-    desc: 'AI notes platform with graph memory. Chat with your own journal entries. Memgraph + Next.js + Docker.',
-    stack: ['Next.js', 'TypeScript', 'Memgraph', 'Docker', 'LLM'],
-    status: 'WIP', github: '#', phase: 0.1 },
-  { id: 1, name: 'Azure Pavilion', domain: 'LLM INFRA', tier: 0, complexity: 10, recency: 10,
-    desc: 'Open-source LiteLLM-inspired control plane. Multi-model routing, API key issuance, vLLM backend.',
-    stack: ['vLLM', 'LiteLLM', 'FastAPI', 'Docker', 'OpenAPI'],
-    status: 'WIP', github: '#', phase: 0.6 },
-  { id: 2, name: 'Serenity CLI', domain: 'BACKEND', tier: 1, complexity: 7, recency: 8,
-    desc: 'Internal AI CLI backed by private LLM endpoints. Auth, API key control, auditable consumption inside private networks.',
-    stack: ['Python', 'FastAPI', 'CLI', 'Auth', 'Docker'],
-    status: 'WIP', github: '#', phase: 0.0 },
-  { id: 3, name: 'CV-Search', domain: 'AI / ML', tier: 1, complexity: 7, recency: 7,
-    desc: 'Vector DB resume ranking system. LLM-powered similarity re-ranking for recruiters. pgvector + FastAPI.',
-    stack: ['pgvector', 'FastAPI', 'SQLAlchemy', 'LLM', 'Python'],
-    status: 'LIVE', github: '#', phase: 0.45 },
-  { id: 4, name: 'ADAM System', domain: 'RESEARCH', tier: 2, complexity: 9, recency: 6,
-    desc: 'Automotive Diagnostic & Monitoring. OBD-II + Raspberry Pi. AI driver behavior analysis. BITS Pilani research.',
-    stack: ['Python', 'OBD-II', 'Raspberry Pi', 'ML', 'SQLite'],
-    status: 'LIVE', github: '#', phase: 0.15 },
-  { id: 5, name: 'TxtToSQL', domain: 'BACKEND', tier: 2, complexity: 6, recency: 5,
-    desc: 'Natural language to SQL. Buffer-based context injection solves LLM memory limits. SQLAlchemy + Cursor.',
-    stack: ['Python', 'SQLAlchemy', 'LLM', 'FastAPI', 'NLP'],
-    status: 'LIVE', github: '#', phase: 0.65 },
-];
+function formatTimeAgo(dateString: string): string {
+  const now = Date.now();
+  const then = new Date(dateString).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${diffDay}d ago`;
+}
 
 const ORBITS = [
   { r: 0.22, rotX: 1.25, rotY: 0.4, rotZ: 0.12, baseSpeed: 0.00035 },
@@ -51,7 +30,30 @@ const ORBITS = [
   { r: 0.40, rotX: 1.40, rotY: 0.1, rotZ: 0.04, baseSpeed: 0.00013 },
 ];
 
-export default function VoidCanvas() {
+const PLANET_COLORS: Record<string, { c1: string, c2: string, c3: string, c4: string, glow: string }> = {
+  purple: { c1: '235,215,255', c2: '192,132,252', c3: '109,40,217', c4: '50,10,100', glow: '192,132,252' },
+  blue: { c1: '215,235,255', c2: '96,165,250', c3: '37,99,235', c4: '10,30,100', glow: '96,165,250' },
+  green: { c1: '215,255,225', c2: '74,222,128', c3: '22,163,74', c4: '10,80,30', glow: '74,222,128' },
+  red: { c1: '255,215,215', c2: '248,113,113', c3: '220,38,38', c4: '100,20,20', glow: '248,113,113' },
+  orange: { c1: '255,230,200', c2: '251,146,60', c3: '234,88,12', c4: '120,40,10', glow: '251,146,60' },
+  yellow: { c1: '255,255,210', c2: '250,204,21', c3: '202,138,4', c4: '100,60,10', glow: '250,204,21' },
+  cyan: { c1: '210,255,255', c2: '34,211,238', c3: '8,145,178', c4: '10,70,90', glow: '34,211,238' },
+  magenta: { c1: '255,210,255', c2: '232,121,249', c3: '192,38,211', c4: '90,10,90', glow: '232,121,249' },
+  white: { c1: '255,255,255', c2: '226,232,240', c3: '148,163,184', c4: '50,60,70', glow: '226,232,240' },
+  silver: { c1: '240,240,245', c2: '161,161,170', c3: '82,82,91', c4: '30,30,40', glow: '161,161,170' },
+  gold: { c1: '255,245,210', c2: '252,211,77', c3: '217,119,6', c4: '100,50,10', glow: '252,211,77' },
+  rose: { c1: '255,220,230', c2: '251,113,133', c3: '225,29,72', c4: '100,10,30', glow: '251,113,133' },
+  teal: { c1: '210,250,245', c2: '45,212,191', c3: '13,148,136', c4: '10,70,60', glow: '45,212,191' },
+  indigo: { c1: '220,225,255', c2: '129,140,248', c3: '79,70,229', c4: '30,20,100', glow: '129,140,248' },
+  violet: { c1: '235,215,255', c2: '167,139,250', c3: '124,58,237', c4: '50,20,100', glow: '167,139,250' },
+  crimson: { c1: '255,200,210', c2: '244,63,94', c3: '159,18,57', c4: '80,10,20', glow: '244,63,94' },
+  emerald: { c1: '210,255,220', c2: '52,211,153', c3: '5,150,105', c4: '10,70,40', glow: '52,211,153' },
+  sapphire: { c1: '210,230,255', c2: '56,189,248', c3: '2,132,199', c4: '10,50,90', glow: '56,189,248' },
+  amethyst: { c1: '240,210,255', c2: '216,180,254', c3: '147,51,234', c4: '70,20,110', glow: '216,180,254' },
+  obsidian: { c1: '180,180,190', c2: '71,85,105', c3: '15,23,42', c4: '5,5,10', glow: '71,85,105' },
+};
+
+export default function VoidCanvas({ projects, buildLog }: VoidCanvasProps) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const miniCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,11 +63,30 @@ export default function VoidCanvas() {
   const descRef = useRef<HTMLDivElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
+  const linksRef = useRef<HTMLDivElement>(null);
+
+  const initP = useCallback(() => {
+    return projects.map((p, i) => ({
+      id: p.id,
+      name: p.title,
+      domain: p.domain,
+      tier: p.orbitTier === 'A' ? 0 : p.orbitTier === 'B' ? 1 : 2,
+      complexity: p.complexity,
+      desc: p.shortDescription,
+      stack: p.stack,
+      status: p.status,
+      github: p.githubUrl,
+      url: p.projectUrl,
+      color: p.planetColor,
+      phase: i / Math.max(1, projects.length),
+    }));
+  }, [projects]);
+  const internalProjects = initP();
 
   const stateRef = useRef({
     t: 0,
     selectedOrbit: -1,
-    selectedProject: null as ProjectData | null,
+    selectedProject: null as any,
     expandedOrb: null as number | null,
     expandProgress: 0,
     orbitSpeeds: ORBITS.map(o => o.baseSpeed),
@@ -82,11 +103,10 @@ export default function VoidCanvas() {
     targetCamRotX: 0, targetCamRotY: 0, targetCamScale: 1.0,
     isDragging: false, dragStartX: 0, dragStartY: 0, clickStartX: 0, clickStartY: 0,
 
-    projects: PROJECTS.map(p => ({ ...p })), // mutable copy
+    projects: internalProjects, 
   });
 
-  const orbPositions = useRef(PROJECTS.map(() => ({ x: 0, y: 0, r: 0 })));
-
+  const orbPositions = useRef(internalProjects.map(() => ({ x: 0, y: 0, r: 0 })));
   const diskParticles = useRef<any[]>([]);
   const stars = useRef<any[]>([]);
 
@@ -193,7 +213,7 @@ export default function VoidCanvas() {
       return { x: st.cx + vx, y: st.cy * 0.95 + vy, depth, pz };
     }
 
-    function getOrbRadius(proj: ProjectData) {
+    function getOrbRadius(proj: any) {
       return (8 + proj.complexity * 1.8) * (st.W / 1440) * st.camScale;
     }
 
@@ -208,7 +228,7 @@ export default function VoidCanvas() {
     }
 
     // ─── PANEL ───────────────────────────────────────
-    function selectProject(proj: ProjectData, idx: number) {
+    function selectProject(proj: any, idx: number) {
       if (st.expandedOrb === idx) { closePanel(); return; }
       st.expandedOrb = idx;
       st.expandProgress = 0;
@@ -220,14 +240,26 @@ export default function VoidCanvas() {
       if (descRef.current) descRef.current.textContent = proj.desc;
       if (stackRef.current) {
         stackRef.current.innerHTML = '';
-        proj.stack.forEach(s => {
+        proj.stack.forEach((s: string) => {
           const sp = document.createElement('span');
           sp.textContent = s;
           stackRef.current!.appendChild(sp);
         });
       }
       if (panelRef.current) panelRef.current.classList.add('open');
-      st.panelOpen = true;
+      
+      if (linksRef.current) {
+        linksRef.current.innerHTML = '';
+        if (proj.github) {
+          const a = document.createElement('a'); a.href = proj.github; a.target = '_blank';
+          a.className = 'vbtn-primary'; a.textContent = 'GitHub ↗'; linksRef.current.appendChild(a);
+        }
+        if (proj.url) {
+          const a = document.createElement('a'); a.href = proj.url; a.target = '_blank';
+          a.className = 'vbtn-ghost'; a.textContent = 'Project →'; linksRef.current.appendChild(a);
+        }
+      }
+st.panelOpen = true;
       drawMiniCanvas(proj);
     }
 
@@ -240,7 +272,7 @@ export default function VoidCanvas() {
 
     // ─── MINI CANVAS ─────────────────────────────────
     let miniAnimId: number;
-    function drawMiniCanvas(proj: ProjectData) {
+    function drawMiniCanvas(proj: any) {
       const mc = miniCanvasRef.current;
       if (!mc) return;
       const mctx = mc.getContext('2d') as CanvasRenderingContext2D;
@@ -623,9 +655,11 @@ export default function VoidCanvas() {
 
         const glowR = r * 2.5;
         const glowAlpha = isExpanded ? 0.25 : 0.12;
+        const pc = PLANET_COLORS[p.color || "purple"] || PLANET_COLORS["purple"];
+        
         const glow = ctx.createRadialGradient(px, py, 0, px, py, glowR);
-        glow.addColorStop(0, `rgba(192,132,252,${glowAlpha})`);
-        glow.addColorStop(0.5, `rgba(109,40,217,${glowAlpha * 0.4})`);
+        glow.addColorStop(0, `rgba(${pc.glow},${glowAlpha})`);
+        glow.addColorStop(0.5, `rgba(${pc.c3},${glowAlpha * 0.4})`);
         glow.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = glow;
         ctx.beginPath();
@@ -634,10 +668,10 @@ export default function VoidCanvas() {
 
         const orbG = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, 0, px, py, r);
         const brightness = isExpanded ? 1.15 : depthScale;
-        orbG.addColorStop(0, `rgba(235,215,255,${0.95 * brightness})`);
-        orbG.addColorStop(0.35, `rgba(192,132,252,${0.9 * brightness})`);
-        orbG.addColorStop(0.7, `rgba(109,40,217,${0.8 * brightness})`);
-        orbG.addColorStop(1, `rgba(50,10,100,${0.6 * brightness})`);
+        orbG.addColorStop(0, `rgba(${pc.c1},${0.95 * brightness})`);
+        orbG.addColorStop(0.35, `rgba(${pc.c2},${0.9 * brightness})`);
+        orbG.addColorStop(0.7, `rgba(${pc.c3},${0.8 * brightness})`);
+        orbG.addColorStop(1, `rgba(${pc.c4},${0.6 * brightness})`);
         ctx.fillStyle = orbG;
         ctx.beginPath();
         ctx.arc(px, py, r, 0, Math.PI * 2);
@@ -664,7 +698,7 @@ export default function VoidCanvas() {
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(st.t * 0.015 * (ri % 2 === 0 ? 1 : -1));
-            ctx.strokeStyle = `rgba(192,132,252,${0.25 * ep - ri * 0.06})`;
+            ctx.strokeStyle = `rgba(${pc.glow},${0.25 * ep - ri * 0.06})`;
             ctx.lineWidth = 0.8 * st.camScale;
             ctx.setLineDash([3, 7 + ri * 2]);
             ctx.beginPath();
@@ -831,11 +865,15 @@ export default function VoidCanvas() {
           <div className="dot" />
           <span className="live">LIVE</span>
           <span>|</span>
-          <span>Currently: <span className="hl">Azure Pavilion</span> — LiteLLM control plane</span>
+          <span>
+            Currently: <span className="hl">{buildLog.currentProject}</span> — {buildLog.currentStatus}
+          </span>
           <span>|</span>
-          <span>Last signal: 2m ago</span>
+          <span>Last signal: {formatTimeAgo(buildLog.lastSignal)}</span>
           <span>|</span>
-          <span>Open to: Hire / Collaborate</span>
+          <span>Open to: {buildLog.openTo.join(' / ') || 'Open'}</span>
+          <span>|</span>
+          <span>Planets: {internalProjects.length}</span>
         </div>
 
         <div className="void-panel" ref={panelRef}>
@@ -850,10 +888,7 @@ export default function VoidCanvas() {
           </div>
           <div className="void-panel-desc" ref={descRef}>Description goes here.</div>
           <div className="void-panel-stack" ref={stackRef} />
-          <div className="void-panel-links">
-            <a href="#" className="vbtn-primary">GitHub ↗</a>
-            <a href="#" className="vbtn-ghost">Case Study →</a>
-          </div>
+          <div className="void-panel-links" ref={linksRef}></div>
         </div>
 
         <canvas ref={canvasRef} id="void-canvas" />
