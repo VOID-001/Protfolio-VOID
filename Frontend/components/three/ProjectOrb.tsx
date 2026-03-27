@@ -1,185 +1,220 @@
 'use client';
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
-import gsap from 'gsap';
-import type { Project, OrbitConfig } from '@/lib/types';
-import { useOrbInteraction } from '@/hooks/useOrbInteraction';
+import { useSceneStore } from '@/hooks/useSceneStore';
+import type { Project } from '@/lib/types';
 
-interface ProjectOrbProps {
-  project: Project;
-  orbitConfig: OrbitConfig;
-  speed: number;
-  phaseOffset: number;
-}
+const PLANET_COLORS: Record<string, string> = {
+  purple: '#c084fc', blue: '#60a5fa', green: '#4ade80', red: '#f87171',
+  orange: '#fb923c', yellow: '#facc15', cyan: '#22d3ee', magenta: '#e879f9',
+  white: '#e2e8f0', silver: '#a1a1aa', gold: '#fcd34d', rose: '#fb7185',
+  teal: '#2dd4bf', indigo: '#818cf8', violet: '#a78bfa', crimson: '#f43f5e',
+  emerald: '#34d399', sapphire: '#38bdf8', amethyst: '#d8b4fe', obsidian: '#475569',
+};
 
-function ProjectOrb({ project, orbitConfig, speed, phaseOffset }: ProjectOrbProps) {
+const ORBIT_CONFIGS = [
+  { rx: 4.0, ry: 2.8, inc: 0.55, speed: 0.14, py: 0.02, pz: 0.005 },
+  { rx: 5.5, ry: 3.5, inc: 0.45, speed: 0.09, py: -0.015, pz: -0.008 },
+  { rx: 7.0, ry: 4.5, inc: 0.35, speed: 0.06, py: 0.01, pz: 0.004 },
+];
+
+// Photon-ring style glow shader — same approach as BlackHole.tsx
+const glowVertexShader = `
+  varying vec3 vNormal;
+  varying vec3 vViewDir;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vViewDir = normalize(cameraPosition - worldPos.xyz);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const glowFragmentShader = `
+  varying vec3 vNormal;
+  varying vec3 vViewDir;
+  uniform vec3 uColor;
+  uniform float uIntensity;
+  void main() {
+    float f = 1.0 - abs(dot(normalize(vNormal), normalize(vViewDir)));
+    
+    // Sharp photon-ring style rim glow (like the black hole)
+    float ring = pow(f, 5.0) * 2.5;
+    
+    // Softer outer halo for atmosphere
+    float halo = pow(f, 2.5) * 0.4;
+    
+    float glow = (ring + halo) * uIntensity;
+    
+    // Brighter core, deeper edge color variation
+    vec3 brightColor = uColor + vec3(0.15);
+    vec3 deepColor = uColor * 0.6;
+    vec3 finalColor = mix(deepColor, brightColor, ring / (ring + 0.5));
+    
+    gl_FragColor = vec4(finalColor * glow, glow);
+  }
+`;
+
+export function ProjectOrb({ project, index, isMobile }: { project: Project; index: number; isMobile?: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
   const innerGroupRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
-  const coronaRef = useRef<THREE.Mesh>(null);
-  const progressRef = useRef(phaseOffset);
-  const currentSpeedRef = useRef(speed);
-  const worldPosRef = useRef(new THREE.Vector3());
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const glowMatRef = useRef<THREE.ShaderMaterial>(null);
+  
+  const tier = project.orbitTier === 'A' ? 0 : project.orbitTier === 'B' ? 1 : 2;
+  const config = ORBIT_CONFIGS[tier];
+  
+  const curve = useMemo(() => new THREE.EllipseCurve(0, 0, config.rx, config.ry, 0, 2*Math.PI, false, 0), [config]);
+  
+  const progressRef = useRef(index / 10);
 
-  const { state, hoveredId, selectedId, setHovered, setSelected, slowedOrbit } =
-    useOrbInteraction();
-
-  // Compute orb properties from project data
-  const radius = useMemo(
-    () => 0.22 + (project.complexity / 10) * 0.22,
-    [project.complexity]
-  );
-  const baseIntensity = useMemo(
-    () => 0.3 + (project.recency / 10) * 0.6,
-    [project.recency]
-  );
-
-  // Pre-compute the orbit curve once
-  const curve = useMemo(
-    () =>
-      new THREE.EllipseCurve(
-        0, 0,
-        orbitConfig.xRadius, orbitConfig.yRadius,
-        0, 2 * Math.PI,
-        false, 0
-      ),
-    [orbitConfig.xRadius, orbitConfig.yRadius]
-  );
-
+  const selectedProject = useSceneStore(s => s.selectedProject);
+  const hoveredId = useSceneStore(s => s.hoveredProjectId);
+  const setSelectedProject = useSceneStore(s => s.setSelectedProject);
+  const setHoveredId = useSceneStore(s => s.setHoveredId);
+  const isSelected = selectedProject?.id === project.id;
   const isHovered = hoveredId === project.id;
-  const isSelected = selectedId === project.id;
-  const isDimmed = state === 'selected' && !isSelected;
-  const isRingSlowed = slowedOrbit === project.orbitTier;
+  
+  const radius = 0.4 + (project.complexity / 10) * 0.2;
+  const colorHex = PLANET_COLORS[project.planetColor || 'purple'] || '#c084fc';
+  
+  const glowColor = useMemo(() => new THREE.Color(colorHex), [colorHex]);
+  const tempVec = useMemo(() => new THREE.Vector3(), []);
 
-  // Use GSAP for selection scale exactly as requested (1.0 to 2.8, 600ms, power2.out)
-  useEffect(() => {
-    if (coreRef.current) {
-      if (isSelected) {
-        gsap.to(coreRef.current.scale, { x: 2.8, y: 2.8, z: 2.8, duration: 0.6, ease: 'power2.out' });
-      } else if (isHovered && state !== 'selected') {
-        gsap.to(coreRef.current.scale, { x: 1.25, y: 1.25, z: 1.25, duration: 0.3, ease: 'power2.out' });
-      } else {
-        gsap.to(coreRef.current.scale, { x: 1, y: 1, z: 1, duration: 0.4, ease: 'power2.out' });
-      }
+  useFrame((state, delta) => {
+    // Only move the planet along the static orbit path
+    if (!isSelected) {
+      progressRef.current += config.speed * delta * 0.08;
     }
-  }, [isSelected, isHovered, state]);
-
-  useFrame((_, delta) => {
-    // Lerp speed to target
-    const targetSpeed = isRingSlowed ? speed * 0.12 : speed;
-    currentSpeedRef.current += (targetSpeed - currentSpeedRef.current) * Math.min(delta * 2, 0.1);
+    const point = curve.getPoint((progressRef.current) % 1);
     
-    // Advance orbital position
-    progressRef.current += currentSpeedRef.current * delta;
-    const t = progressRef.current % 1;
-    const point = curve.getPoint(t);
-
     if (innerGroupRef.current) {
       innerGroupRef.current.position.set(point.x, 0, point.y);
-
-      // Store world position for camera tween
-      innerGroupRef.current.getWorldPosition(worldPosRef.current);
     }
-
-    // Rotate core on Y axis
     if (coreRef.current) {
-      coreRef.current.rotation.y += 0.008 * delta * 60;
+      const spinDir = index % 2 === 0 ? 1 : -1;
+      coreRef.current.rotation.y += spinDir * 0.6 * delta;
+      
+      const targetScale = isSelected ? 1.0 : (isHovered ? 0.7 : 0.5);
+      tempVec.set(targetScale, targetScale, targetScale);
+      coreRef.current.scale.lerp(tempVec, 0.1);
 
-      // Animate emissive intensity
-      const mat = coreRef.current.material as THREE.MeshStandardMaterial;
-      const targetIntensity = isDimmed ? 0.05 : baseIntensity;
-      mat.emissiveIntensity +=
-        (targetIntensity - mat.emissiveIntensity) * Math.min(delta * 5, 0.1);
+      if (isSelected) {
+        coreRef.current.getWorldPosition(useSceneStore.getState().selectedPlanetPosition);
+      }
     }
-
-    // Pulse corona on hover
-    if (coronaRef.current) {
-      const coronaMat = coronaRef.current.material as THREE.MeshBasicMaterial;
-      const targetOpacity = isHovered ? 0.22 : isDimmed ? 0.03 : 0.1;
-      coronaMat.opacity += (targetOpacity - coronaMat.opacity) * 0.05;
+    if (materialRef.current) {
+      const targetEmissive = isSelected ? 0.2 : 0.0;
+      materialRef.current.emissiveIntensity += (targetEmissive - materialRef.current.emissiveIntensity) * 0.1;
+    }
+    // Animate glow intensity on hover/select
+    if (glowMatRef.current) {
+      const targetIntensity = isSelected ? 1.8 : (isHovered ? 1.2 : 0.7);
+      glowMatRef.current.uniforms.uIntensity.value += (targetIntensity - glowMatRef.current.uniforms.uIntensity.value) * 0.08;
     }
   });
 
-  const handleClick = () => {
-    setSelected(project, worldPosRef.current.clone());
-  };
-
-  const handlePointerOver = (e: THREE.Event) => {
-    (e as unknown as { stopPropagation: () => void }).stopPropagation();
-    setHovered(project.id);
-    document.body.style.cursor = 'pointer';
-  };
-
-  const handlePointerOut = () => {
-    setHovered(null);
-    document.body.style.cursor = 'default';
-  };
+  const glowUniforms = useMemo(() => ({
+    uColor: { value: glowColor },
+    uIntensity: { value: 0.7 },
+  }), [glowColor]);
 
   return (
-    <group ref={groupRef} rotation-x={orbitConfig.rotX}>
-      <group ref={innerGroupRef}>
-        {/* Corona — soft halo */}
-        <mesh ref={coronaRef} renderOrder={1}>
-          <sphereGeometry args={[radius * 1.35, 32, 32]} />
-          <meshBasicMaterial
-            color="#c084fc"
-            transparent
-            opacity={0.1}
-            depthWrite={false}
-          />
+    <group ref={groupRef} rotation={[config.inc, 0, 0]}>
+      <group ref={innerGroupRef} 
+             onPointerOver={(e) => { e.stopPropagation(); setHoveredId(project.id); document.body.style.cursor = 'pointer'; }}
+             onPointerOut={(e) => { setHoveredId(null); document.body.style.cursor = 'grab'; }}
+             onClick={(e) => { e.stopPropagation(); setSelectedProject(project); }}>
+        
+        {/* Core Sphere */}
+        <mesh ref={coreRef} renderOrder={4}>
+          <sphereGeometry args={[radius, isMobile ? 32 : 64, isMobile ? 32 : 64]} />
+          {isMobile ? (
+            <meshLambertMaterial ref={materialRef as any} color={colorHex} emissive={colorHex} emissiveIntensity={0.2} />
+          ) : (
+            <meshStandardMaterial 
+              ref={materialRef}
+              color={colorHex}
+              roughness={0.8}
+              metalness={0.2}
+              emissive={colorHex}
+              emissiveIntensity={0.0}
+              onBeforeCompile={(shader) => {
+                shader.vertexShader = shader.vertexShader.replace(
+                  'void main() {',
+                  `varying vec3 vLocalPos;
+                  void main() {
+                    vLocalPos = position;`
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  'void main() {',
+                  `varying vec3 vLocalPos;
+                  void main() {`
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  '#include <map_fragment>',
+                  `
+                  #include <map_fragment>
+                  
+                  float j = 0.0;
+                  vec3 q = vLocalPos * 4.0;
+                  float a = 0.5;
+                  for (int i = 0; i < 4; i++) {
+                    j += a * fract(sin(dot(q, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+                    q *= 2.0;
+                    a *= 0.5;
+                  }
+                  
+                  vec3 pos = vLocalPos * 3.0; 
+                  float f = sin(pos.x * 2.0 + sin(pos.y * 3.0 + j*2.0)) * sin(pos.y * 2.0 + pos.z * 2.0 - j);
+                  f = f * 0.5 + 0.5;
+                  
+                  float c = fract(sin(dot(vLocalPos.xy + j, vec2(12.9898,78.233))) * 43758.5453);
+                  float craters = smoothstep(0.85, 0.95, c) * 0.4;
+                  
+                  diffuseColor.rgb *= (0.6 + f * 0.4 - craters + j * 0.15);
+                  `
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                  '#include <emissivemap_fragment>',
+                  `
+                  #include <emissivemap_fragment>
+                  float viewDot = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+                  float atmFresnel = 1.0 - viewDot;
+                  
+                  float lightDot = dot(normalize(vNormal), normalize(vec3(8.0, 5.0, 6.0))); 
+                  float terminator = smoothstep(-0.2, 0.2, lightDot) * smoothstep(0.5, 0.0, lightDot);
+                  
+                  totalEmissiveRadiance += diffuse * pow(atmFresnel, 3.0) * terminator * 2.0;
+                  totalEmissiveRadiance += diffuse * pow(atmFresnel, 5.0) * smoothstep(0.0, -0.5, lightDot) * 0.3;
+                  `
+                );
+              }}
+            />
+          )}
         </mesh>
 
-        {/* Core orb */}
-        <mesh
-          ref={coreRef}
-          renderOrder={2}
-          onPointerOver={handlePointerOver}
-          onPointerOut={handlePointerOut}
-          onClick={handleClick}
-        >
-          <sphereGeometry args={[radius, 32, 32]} />
-          <meshStandardMaterial
-            color="#c084fc"
-            emissive="#9b5cf6"
-            emissiveIntensity={baseIntensity}
-            roughness={0.2}
-            metalness={0.1}
-          />
-        </mesh>
-
-        {/* Point light */}
-        <pointLight
-          color="#c084fc"
-          intensity={0.6}
-          distance={3.5}
-          decay={2}
-        />
-
-        {/* Floating label */}
+        {/* Floating Label */}
         <Html
-          position={[0, radius + 0.4, 0]}
+          position={[0, radius * 1.8, 0]}
           center
           style={{
-            opacity: isHovered ? 1 : 0,
-            transition: 'opacity 0.2s ease',
-            pointerEvents: 'none',
-            fontFamily: "'IBM Plex Mono', monospace",
+            opacity: isHovered || isSelected ? 1 : 0,
+            transition: 'opacity 0.2s',
+            fontFamily: '"IBM Plex Mono", monospace',
             fontSize: '11px',
             color: '#ede9fe',
             whiteSpace: 'nowrap',
+            pointerEvents: 'none',
             letterSpacing: '0.08em',
-            textShadow: '0 0 12px rgba(124, 58, 237, 0.6)',
-            userSelect: 'none',
-          }}
-        >
+          }}>
           {project.title}
         </Html>
       </group>
     </group>
   );
 }
-
-export default ProjectOrb;

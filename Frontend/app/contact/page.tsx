@@ -1,6 +1,3 @@
-import Navigation from '@/components/ui/Navigation';
-import IdentityMark from '@/components/ui/IdentityMark';
-import MissionStatus from '@/components/ui/MissionStatus';
 import { getContactDetail } from '@/lib/strapi';
 
 function ContactLink({
@@ -73,10 +70,7 @@ export default async function ContactPage() {
   ].filter((item) => item.enabled);
 
   return (
-    <div style={{ minHeight: '100vh', padding: '100px 40px 80px' }}>
-      <IdentityMark />
-      <Navigation />
-
+    <div style={{ padding: '100px 40px 80px', height: '100%', overflowY: 'auto' }}>
       <div
         style={{
           maxWidth: '600px',
@@ -142,8 +136,7 @@ export default async function ContactPage() {
         )}
       </div>
 
-      <MissionStatus />
-    </div>
+      </div>
   );
 }
 

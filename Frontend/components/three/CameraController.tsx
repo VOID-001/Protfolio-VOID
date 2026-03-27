@@ -1,147 +1,124 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useOrbInteraction } from '@/hooks/useOrbInteraction';
+import * as THREE from 'three';
 import gsap from 'gsap';
+import { useSceneStore } from '@/hooks/useSceneStore';
 
-function CameraController() {
-  const { camera, gl } = useThree();
-  const { state, selectedWorldPosition, clearSelection } = useOrbInteraction();
+export function CameraController() {
+  const { camera, gl, scene } = useThree();
+  const selectedProject = useSceneStore((s) => s.selectedProject);
+  const sceneBrightness = useSceneStore((s) => s.sceneBrightness);
+  const introState = useSceneStore((s) => s.introState);
 
-  const azimuthRef = useRef(0);
-  const radiusRef = useRef(20);
-  const elevationRef = useRef(0.32);
-  const mouseRef = useRef({ x: 0, y: 0 });
-  const tweenRef = useRef<gsap.core.Tween | null>(null);
-  const isReducedMotion = useRef(false);
+  const azimuth = useRef(0);
+  const elevation = useRef(0.15); // Lowered to clearly see the bottom halo
 
-  // Check reduced motion preference
+  const targetRadius = useRef(14);
+  const isDragging = useRef(false);
+  const pointerPos = useRef({ x: 0, y: 0 });
+
+  const defaultBgColor = new THREE.Color('#03010e');
+  const tempVec = new THREE.Vector3();
+
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    isReducedMotion.current = mq.matches;
-    const handler = (e: MediaQueryListEvent) => {
-      isReducedMotion.current = e.matches;
-    };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  // Mouse parallax listener
-  useEffect(() => {
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) return;
-
+    const handleMouseDown = () => (isDragging.current = true);
+    const handleMouseUp = () => (isDragging.current = false);
     const handleMouseMove = (e: MouseEvent) => {
-      mouseRef.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouseRef.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
+      pointerPos.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointerPos.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  // Scroll orbit handler
-  useEffect(() => {
-    const canvas = gl.domElement;
-
-    const handleWheel = (e: WheelEvent) => {
-      if (state === 'selected') return;
-      e.preventDefault();
-      azimuthRef.current += e.deltaY * 0.001;
-    };
-
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [gl, state]);
-
-  // ESC key to clear selection
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && state === 'selected') {
-        clearSelection();
+      if (isDragging.current) {
+        azimuth.current -= e.movementX * 0.005;
+        elevation.current -= e.movementY * 0.005;
+        elevation.current = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, elevation.current));
+        useSceneStore.getState().sceneAzimuth = azimuth.current;
+        useSceneStore.getState().sceneElevation = elevation.current;
       }
-    },
-    [state, clearSelection]
-  );
+    };
+    const handleWheel = (e: WheelEvent) => {
+      targetRadius.current += e.deltaY * 0.01;
+      targetRadius.current = Math.max(8, Math.min(22, targetRadius.current));
+    };
 
+    const canvas = gl.domElement;
+    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [gl]);
+
+  // Handle selected project zoom
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
-
-  // Camera tween to selected orb
-  useEffect(() => {
-    if (state === 'selected' && selectedWorldPosition) {
-      // Kill any existing tween
-      if (tweenRef.current) tweenRef.current.kill();
-
-      const targetPos = {
-        x: selectedWorldPosition.x * 0.6,
-        y: selectedWorldPosition.y + 2,
-        z: selectedWorldPosition.z + 5,
-      };
-
-      tweenRef.current = gsap.to(camera.position, {
-        x: targetPos.x,
-        y: targetPos.y,
-        z: targetPos.z,
-        duration: 0.9,
-        ease: 'power3.inOut',
-        onUpdate: () => {
-          camera.lookAt(0, 0, 0);
-        },
-      });
-    } else if (state === 'idle') {
-      // Reverse: tween back to orbit position
-      if (tweenRef.current) tweenRef.current.kill();
-
-      const orbitX = Math.sin(azimuthRef.current) * radiusRef.current;
-      const orbitZ = Math.cos(azimuthRef.current) * radiusRef.current;
-      const orbitY = elevationRef.current * radiusRef.current;
-
-      tweenRef.current = gsap.to(camera.position, {
-        x: orbitX,
-        y: orbitY,
-        z: orbitZ,
-        duration: 0.7,
-        ease: 'power2.out',
-        onUpdate: () => {
-          camera.lookAt(0, 0, 0);
-        },
-      });
+    if (introState !== 'ready') return;
+    if (!selectedProject) {
+      gsap.to(targetRadius, { current: 14, duration: 0.85, ease: 'power3.inOut' });
     }
-  }, [state, selectedWorldPosition, camera]);
+  }, [selectedProject, introState]);
 
-  // Main animation loop
-  useFrame((frameState, delta) => {
-    if (state === 'selected') return;
-    if (isReducedMotion.current) {
-      // Static position, no animation
-      frameState.camera.position.set(0, 6, 20);
-      frameState.camera.lookAt(0, 0, 0);
-      return;
+  // Handle Intro Sequence Hooks
+  useEffect(() => {
+    if (introState === 'pending') {
+      camera.position.set(0, 40, 60);
+      camera.lookAt(0, -0.8, 0);
+    } else if (introState === 'warping') {
+      gsap.fromTo(camera.position, 
+        { x: 0, y: 40, z: 60 }, 
+        { x: 0, y: 0, z: 14, duration: 2.5, ease: 'power3.inOut', onUpdate: () => camera.lookAt(0, 0, 0) }
+      );
+    }
+  }, [introState, camera]);
+
+  const lookAtTarget = useRef(new THREE.Vector3(0, 0, 0));
+  const centerTarget = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+
+  useFrame((state, delta) => {
+    if (introState !== 'ready') return;
+
+    if (!selectedProject && !isDragging.current) {
+      azimuth.current += 0.025 * delta;
+      useSceneStore.getState().sceneAzimuth = azimuth.current;
     }
 
-    // Auto-rotation
-    azimuthRef.current += 0.04 * delta;
+    if (scene.background instanceof THREE.Color) {
+      scene.background.copy(defaultBgColor).multiplyScalar(sceneBrightness);
+    }
 
-    const x = Math.sin(azimuthRef.current) * radiusRef.current;
-    const z = Math.cos(azimuthRef.current) * radiusRef.current;
-    const y = elevationRef.current * radiusRef.current;
+    if (selectedProject) {
+      const planetPos = useSceneStore.getState().selectedPlanetPosition;
+      
+      // Calculate a comfortable viewing offset from the planet
+      // We want the camera to be slightly above and pulled back from the planet
+      tempVec.copy(planetPos).add(new THREE.Vector3(0, 1.2, 5.5));
+      
+      // Include parallax if desired
+      tempVec.x += pointerPos.current.x * 0.2;
+      tempVec.y += pointerPos.current.y * 0.2;
 
-    // Smooth lerp with mouse parallax
-    frameState.camera.position.x +=
-      (x + mouseRef.current.x * 0.8 - frameState.camera.position.x) * 0.02;
-    frameState.camera.position.y +=
-      (y + mouseRef.current.y * 0.5 - frameState.camera.position.y) * 0.02;
-    frameState.camera.position.z +=
-      (z - frameState.camera.position.z) * 0.02;
+      camera.position.lerp(tempVec, 0.04);
+      lookAtTarget.current.lerp(planetPos, 0.06);
+      camera.lookAt(lookAtTarget.current);
 
-    frameState.camera.lookAt(0, 0, 0);
+    } else {
+      // Camera stays fixed on the Z-axis while the environment rotates around the origin
+      const parallaxX = pointerPos.current.x * 0.4;
+      const parallaxY = pointerPos.current.y * 0.4;
+
+      tempVec.set(parallaxX, parallaxY, targetRadius.current);
+      camera.position.lerp(tempVec, 0.08);
+      
+      lookAtTarget.current.lerp(centerTarget, 0.08);
+      camera.lookAt(lookAtTarget.current);
+    }
   });
 
   return null;
 }
-
-export default CameraController;

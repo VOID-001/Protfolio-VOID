@@ -1,6 +1,3 @@
-import Navigation from '@/components/ui/Navigation';
-import IdentityMark from '@/components/ui/IdentityMark';
-import MissionStatus from '@/components/ui/MissionStatus';
 import { getExperiences } from '@/lib/strapi';
 import type { Experience } from '@/lib/types';
 
@@ -141,10 +138,7 @@ export default async function SignalPage() {
   const experiences = await getExperiences();
 
   return (
-    <div style={{ minHeight: '100vh', padding: '100px 40px 80px' }}>
-      <IdentityMark />
-      <Navigation />
-
+    <div style={{ padding: '100px 40px 80px', height: '100%', overflowY: 'auto' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
         <h1
           className="font-display"
@@ -175,7 +169,6 @@ export default async function SignalPage() {
         </div>
       </div>
 
-      <MissionStatus />
-    </div>
+      </div>
   );
 }
