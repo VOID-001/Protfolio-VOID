@@ -177,29 +177,11 @@ export default function VoidCanvas({ projects, buildLog }: VoidCanvasProps) {
     return () => scroller.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Block user wheel and touch scrolling for section navigation, but allow internal scroll for panels
+  // Removed blockWheel and blockTouch completely to allow native frictionless scrolling and 3D dragging on mobile
   useEffect(() => {
     const scroller = document.getElementById('void-scroll-container');
     if (!scroller) return;
     
-    const isPanelScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      return !!target.closest('.void-scroll-panel');
-    };
-
-    const blockWheel = (e: WheelEvent) => {
-      if (!isPanelScroll(e)) e.preventDefault();
-    };
-    const blockTouch = (e: TouchEvent) => {
-      if (!isPanelScroll(e)) e.preventDefault();
-    };
-    
-    scroller.addEventListener('wheel', blockWheel, { passive: false });
-    scroller.addEventListener('touchmove', blockTouch, { passive: false });
-    return () => {
-      scroller.removeEventListener('wheel', blockWheel);
-      scroller.removeEventListener('touchmove', blockTouch);
-    };
   }, []);
 
   useEffect(() => {
@@ -349,11 +331,20 @@ export default function VoidCanvas({ projects, buildLog }: VoidCanvasProps) {
             .void-panel.open { right: 0; }
           }
           @media (max-width: 600px) {
+            .void-root { font-size: 14px; }
             .stack-grid { grid-template-columns: 1fr; }
-            .void-scroll-panel { padding: 80px 20px !important; }
-            .void-identity h1 { font-size: 14px; }
-            .void-nav { top: auto; bottom: 80px; left: 20px; right: auto; text-align: left; }
-            .void-hint { font-size: 8px; bottom: 60px; }
+            .void-scroll-panel { padding: 80px 20px 100px !important; }
+            
+            /* Top Identity & Nav positioning */
+            .void-identity { top: 16px; left: 16px; }
+            .void-identity h1 { font-size: 16px; }
+            .void-identity p { font-size: 9px; }
+            
+            .void-nav { top: 16px; right: 16px; gap: 8px; }
+            .void-nav a { font-size: 9px; letter-spacing: 0.08em; }
+            
+            .void-status { display: none !important; }
+            .void-hint { font-size: 8px; bottom: 30px; }
           }
         `}</style>
 
