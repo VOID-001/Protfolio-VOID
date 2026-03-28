@@ -454,7 +454,15 @@ export default function VoidCanvas({ projects, buildLog }: VoidCanvasProps) {
           <div className="void-panel-domain">{selectedProject ? `${selectedProject.domain} · ${selectedProject.status}` : 'DOMAIN · STATUS'}</div>
           <div className="void-panel-divider" />
           <div className="void-panel-preview">
-            <canvas ref={miniCanvasRef} width={344} height={140} />
+            {selectedProject?.thumbnailUrl && selectedProject.thumbnailUrl !== '/placeholder.png' ? (
+              <img 
+                src={selectedProject.thumbnailUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}${selectedProject.thumbnailUrl}` : selectedProject.thumbnailUrl} 
+                alt={selectedProject.title} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
+              />
+            ) : (
+              <canvas ref={miniCanvasRef} width={344} height={140} />
+            )}
           </div>
           <div className="void-panel-desc">{selectedProject?.shortDescription || 'Description goes here.'}</div>
           <div className="void-panel-stack">
