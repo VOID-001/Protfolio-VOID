@@ -108,7 +108,7 @@ export function ProjectOrb({ project, index, isMobile }: { project: Project; ind
       }
     }
     if (materialRef.current) {
-      const targetEmissive = isSelected ? 0.2 : 0.0;
+      const targetEmissive = isSelected ? 0.45 : isHovered ? 0.24 : 0.1;
       materialRef.current.emissiveIntensity += (targetEmissive - materialRef.current.emissiveIntensity) * 0.1;
     }
     // Animate glow intensity on hover/select
@@ -120,7 +120,7 @@ export function ProjectOrb({ project, index, isMobile }: { project: Project; ind
 
   const glowUniforms = useMemo(() => ({
     uColor: { value: glowColor },
-    uIntensity: { value: 0.7 },
+    uIntensity: { value: 1.0 },
   }), [glowColor]);
 
   return (
@@ -134,15 +134,15 @@ export function ProjectOrb({ project, index, isMobile }: { project: Project; ind
         <mesh ref={coreRef} renderOrder={4}>
           <sphereGeometry args={[radius, isMobile ? 32 : 64, isMobile ? 32 : 64]} />
           {isMobile ? (
-            <meshLambertMaterial ref={materialRef as any} color={colorHex} emissive={colorHex} emissiveIntensity={0.2} />
+            <meshLambertMaterial ref={materialRef as any} color={colorHex} emissive={colorHex} emissiveIntensity={0.24} />
           ) : (
             <meshStandardMaterial 
               ref={materialRef}
               color={colorHex}
-              roughness={0.8}
-              metalness={0.2}
+              roughness={0.68}
+              metalness={0.12}
               emissive={colorHex}
-              emissiveIntensity={0.0}
+              emissiveIntensity={0.1}
               onBeforeCompile={(shader) => {
                 shader.vertexShader = shader.vertexShader.replace(
                   'void main() {',
@@ -198,6 +198,21 @@ export function ProjectOrb({ project, index, isMobile }: { project: Project; ind
           )}
         </mesh>
 
+        {/* Outer aura so CMS colors read clearly even against the purple scene */}
+        <mesh renderOrder={3}>
+          <sphereGeometry args={[radius * 1.85, isMobile ? 24 : 48, isMobile ? 24 : 48]} />
+          <shaderMaterial
+            ref={glowMatRef}
+            uniforms={glowUniforms}
+            vertexShader={glowVertexShader}
+            fragmentShader={glowFragmentShader}
+            transparent
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.BackSide}
+          />
+        </mesh>
+
         {/* Floating Label */}
         <Html
           position={[0, radius * 1.8, 0]}
@@ -207,10 +222,11 @@ export function ProjectOrb({ project, index, isMobile }: { project: Project; ind
             transition: 'opacity 0.2s',
             fontFamily: '"IBM Plex Mono", monospace',
             fontSize: '11px',
-            color: '#ede9fe',
+            color: colorHex,
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
             letterSpacing: '0.08em',
+            textShadow: `0 0 12px ${colorHex}`,
           }}>
           {project.title}
         </Html>
