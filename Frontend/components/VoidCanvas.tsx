@@ -340,6 +340,21 @@ export default function VoidCanvas({ projects, buildLog }: VoidCanvasProps) {
           .vbtn-ghost{background:transparent;border:1px solid rgba(192,132,252,.2);color:rgba(240,236,255,.5)}
           .vbtn-ghost:hover{border-color:rgba(192,132,252,.4);color:rgba(240,236,255,.8)}
           .void-hint{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:rgba(240,236,255,.22);text-align:center;pointer-events:none;transition:opacity 1s;z-index:5}
+          
+          /* Responsive Layout */
+          .stack-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+          @media (max-width: 900px) {
+            .stack-grid { grid-template-columns: repeat(2, 1fr); }
+            .void-panel { width: 100%; right: -100%; }
+            .void-panel.open { right: 0; }
+          }
+          @media (max-width: 600px) {
+            .stack-grid { grid-template-columns: 1fr; }
+            .void-scroll-panel { padding: 80px 20px !important; }
+            .void-identity h1 { font-size: 14px; }
+            .void-nav { top: auto; bottom: 80px; left: 20px; right: auto; text-align: left; }
+            .void-hint { font-size: 8px; bottom: 60px; }
+          }
         `}</style>
 
       <div className="void-root">
@@ -479,7 +494,7 @@ export default function VoidCanvas({ projects, buildLog }: VoidCanvasProps) {
                 <p className="font-mono" style={{ fontSize: '13px', color: 'rgba(248, 246, 255, 0.45)', marginBottom: '40px', maxWidth: '500px' }}>
                   The systems and tools I build with. Proficiency reflects production usage, not tutorial completion.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div className="stack-grid">
                   {skills && skills.map((skill) => {
                     const domainColor = DOMAIN_COLORS[skill.domain] || '#7c3aed';
                     return (
