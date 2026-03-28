@@ -216,6 +216,11 @@ async function ensurePublishedCollection(
     }
   }
 
+  // Prevent seeding default arrays if the user has already entered custom data
+  if (existing.length > 0 && !existing.every((e) => e[key] === 'test')) {
+    return;
+  }
+
   const refreshed = (await documents.findMany({ status: 'published' as any })) as Array<
     Record<string, unknown>
   >;
