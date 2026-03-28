@@ -105,7 +105,7 @@ export const StarField = React.memo(function StarField({ isMobile }: { isMobile?
 
 export function Comets() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const count = 18;
+  const count = 40;
   
   const dummy = useMemo(() => new THREE.Object3D(), []);
   
@@ -123,7 +123,7 @@ export function Comets() {
         pos: start.clone(),
         start,
         velocity,
-        delay: Math.random() * 15,
+        delay: Math.random() * 5,
         active: false,
         life: 0,
         // Scale handles thickness and length
@@ -155,7 +155,7 @@ export function Comets() {
         
         if (comet.life <= 0 || comet.pos.y < -100) {
           comet.active = false;
-          comet.delay = 1.0 + Math.random() * 12.0; // random delay before respawn
+          comet.delay = 0.5 + Math.random() * 4.0; // tighter random delay before rapid respawn
         }
       }
       

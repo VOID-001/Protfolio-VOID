@@ -198,21 +198,6 @@ export function ProjectOrb({ project, index, isMobile }: { project: Project; ind
           )}
         </mesh>
 
-        {/* Outer aura so CMS colors read clearly even against the purple scene */}
-        <mesh renderOrder={3}>
-          <sphereGeometry args={[radius * 1.85, isMobile ? 24 : 48, isMobile ? 24 : 48]} />
-          <shaderMaterial
-            ref={glowMatRef}
-            uniforms={glowUniforms}
-            vertexShader={glowVertexShader}
-            fragmentShader={glowFragmentShader}
-            transparent
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            side={THREE.BackSide}
-          />
-        </mesh>
-
         {/* Floating Label */}
         <Html
           position={[0, radius * 1.8, 0]}
