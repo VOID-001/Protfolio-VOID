@@ -150,7 +150,7 @@ function mapContactDetail(raw: unknown): ContactDetail {
 
 export async function getProjects(): Promise<Project[]> {
   const response = await strapiFetch<{ data?: unknown[] }>(
-    '/projects?sort=recency:desc'
+    '/projects?sort=recency:desc&populate=*'
   );
 
   if (Array.isArray(response?.data) && response.data.length > 0) {
@@ -161,7 +161,7 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getSkills(): Promise<Skill[]> {
-  const response = await strapiFetch<{ data?: unknown[] }>('/skills?sort=proficiency:desc');
+  const response = await strapiFetch<{ data?: unknown[] }>('/skills?sort=proficiency:desc&populate=*');
 
   if (Array.isArray(response?.data) && response.data.length > 0) {
     return response.data.map(mapStrapiSkill);
@@ -171,7 +171,7 @@ export async function getSkills(): Promise<Skill[]> {
 }
 
 export async function getExperiences(): Promise<Experience[]> {
-  const response = await strapiFetch<{ data?: unknown[] }>('/experiences?sort=startDate:desc');
+  const response = await strapiFetch<{ data?: unknown[] }>('/experiences?sort=startDate:desc&populate=*');
 
   if (Array.isArray(response?.data) && response.data.length > 0) {
     return response.data.map(mapStrapiExperience);
@@ -181,7 +181,7 @@ export async function getExperiences(): Promise<Experience[]> {
 }
 
 export async function getBuildLog(): Promise<BuildLog> {
-  const response = await strapiFetch<{ data?: unknown }>('/build-log');
+  const response = await strapiFetch<{ data?: unknown }>('/build-log?populate=*');
 
   if (response?.data) {
     return mapBuildLog(response.data);
@@ -197,7 +197,7 @@ export async function getBuildLog(): Promise<BuildLog> {
 }
 
 export async function getContactDetail(): Promise<ContactDetail> {
-  const response = await strapiFetch<{ data?: unknown }>('/contact-detail');
+  const response = await strapiFetch<{ data?: unknown }>('/contact-detail?populate=*');
 
   if (response?.data) {
     return mapContactDetail(response.data);
